@@ -1,8 +1,14 @@
 #version 430 core
 
-in vec3 position;
+layout(location = 0) in vec3 position;
+layout(location = 1) in vec4 vertColor;
+
+layout(location = 0) uniform mat4 u_Affine;
+
+out vec4 fragColor;
 
 void main()
 {
-    gl_Position = vec4(position, 1.0f);
+    gl_Position = u_Affine * vec4(position.x, position.y, position.z, 1.0f);
+    fragColor = vertColor;
 }
