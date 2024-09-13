@@ -9,6 +9,6 @@ out vec4 fragColor;
 
 void main()
 {
-    gl_Position = u_Affine * vec4(position.x, position.y, position.z, 1.0f);
+    gl_Position = vec4(position.x, position.y, position.z, 1.0f) * u_Affine;
     fragColor = vertColor;
 }

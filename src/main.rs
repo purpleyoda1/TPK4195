@@ -1,12 +1,12 @@
 // Uncomment these following global attributes to silence most warnings of "low" interest:
-/*
+
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 #![allow(unreachable_code)]
 #![allow(unused_mut)]
 #![allow(unused_unsafe)]
 #![allow(unused_variables)]
-*/
+
 extern crate gl;
 extern crate nalgebra_glm as glm;
 use std::collections::HashSet;
@@ -58,63 +58,30 @@ fn offset<T>(n: u32) -> *const c_void {
 // ptr::null()
 
 // Set up camera functions
-struct Camera {
-    x: f32,
-    y: f32,
-    z: f32,
+struct Model {
+    pos: glm::Vec3,
     yaw: f32,
     pitch: f32,
-    transformation: glm::Mat4,
+    transformation: glm::Mat4
 }
 
-impl Camera {
+impl Model {
     fn new() -> Self {
         Self {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
+            pos: glm::vec3(0.0, 0.0, 0.0),
             yaw: 0.0,
             pitch: 0.0,
-            transformation: glm::Mat4::identity(),
+            transformation: glm::Mat4::identity()
         }
     }
-}
 
-fn update_camera_matrix(camera: &mut Camera) {
-    camera.transformation = glm::mat4(
-        1.0, 0.0, 0.0, 0.0,
-        0.0, 1.0, 0.0, 0.0,
-        0.0, 0.0, 1.0, 0.0,
-        0.0, 0.0, 0.0, 1.0,
-    );
+    fn update_transformation_matrix(&mut self) {
+        let translation = glm::translate(&glm::Mat4::identity(), &self.pos);
+        let rotation_pitch = glm::rotate_x(&glm::Mat4::identity(), self.pitch.to_radians());
+        let rotation_yaw = glm::rotate_y(&glm::Mat4::identity(), self.yaw.to_radians());
 
-    let cos_pitch = camera.pitch.to_radians().cos();
-    let sin_pitch = camera.pitch.to_radians().sin();
-    let cos_yaw = camera.yaw.to_radians().cos();
-    let sin_yaw = camera.yaw.to_radians().sin();
-
-    let pitch_rotation = glm::mat4(
-        1.0, 0.0, 0.0, 0.0,
-        0.0, cos_pitch, -sin_pitch, 0.0,
-        0.0, sin_pitch, cos_pitch, 0.0,
-        0.0, 0.0, 0.0, 1.0
-    );
-
-    let yaw_rotation = glm::mat4(
-        cos_yaw, -sin_yaw, 0.0, 0.0,
-        sin_yaw, cos_yaw, 0.0, 0.0,
-        0.0, 0.0, 1.0, 0.0,
-        0.0, 0.0, 0.0, 1.0
-    );
-
-    let rotation_matrix = pitch_rotation * yaw_rotation;
-
-    // Translation matrix based on camera position
-    let translation_vector = Vec3::new(-camera.x, -camera.y, -camera.z);
-    let translation_matrix = translate(&glm::Mat4::identity(), &translation_vector);
-
-    // Combine rotation and translation to form the view matrix
-    camera.transformation = translation_matrix * rotation_matrix;
+        self.transformation = translation * rotation_yaw * rotation_pitch
+    }
 }
 
 // == // Generate your VAO here
@@ -247,12 +214,15 @@ fn main() {
 
         // == // Set up your VAO around here
         let vertices: Vec<f32> = vec![
-            -0.8, -0.8, -0.5,
-            0.0, -0.8, -0.5,
-            0.8, -0.8, -0.5,
-            -0.4, 0.0, -0.5,
-            0.4, 0.0, -0.5,
-            0.0, 0.8, -0.5,
+            -0.8, -0.8, 0.2,
+            0.0, -0.8, 0.2,
+            -0.4, 0.0, 0.2,
+            0.8, -0.8, 0.0,
+            0.4, 0.0, 0.0,
+            0.0, -0.8, 0.0,
+            0.0, 0.8, -0.2,
+            -0.4, 0.0, -0.2,
+            0.4, 0.0, -0.2,
         ];
 
         let color: Vec<f32> = vec![
@@ -261,13 +231,16 @@ fn main() {
             1.0, 0.0, 0.0, 0.5,
             0.0, 0.0, 1.0, 0.5,
             0.0, 0.0, 1.0, 0.5,
+            0.0, 0.0, 1.0, 0.5,
+            0.0, 1.0, 0.0, 0.5,
+            0.0, 1.0, 0.0, 0.5,
             0.0, 1.0, 0.0, 0.5,
         ];
 
         let  indices: Vec<u32> = vec![
-            0, 1, 3,
-            1, 2, 4,
+            0, 1, 2,
             3, 4, 5,
+            6, 7, 8,
         ];
 
         let my_vao = unsafe { create_vao(&vertices, &indices, &color) };
@@ -282,18 +255,13 @@ fn main() {
         };
         
         // Set up projection and depth transformation
-        let projection: glm::Mat4 = glm::perspective(1.6, 1.6, 1.0, 100.0);
-        let depth_transformation =  glm::mat4(
-            1.0, 0.0, 0.0, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            0.0, 0.0, 49.5, -50.5,
-            0.0, 0.0, 0.0, 1.0
-        );
-
-        // Initialize camera
-        let mut camera = Camera::new();
-        let speed = 2.0;
-        let rotation_speed = 30.0;
+        let projection: glm::Mat4 = glm::perspective(window_aspect_ratio, 90.0, 1.0, 100.0);
+        let view: glm::Mat4 = glm::translate(&glm::Mat4::identity(), &glm::vec3(0.0, 0.0, -10.0));
+        
+        // Initialize model transformation
+        let mut model = Model::new();
+        let speed = 5.0;
+        let rotation_speed = 50.0;
 
         // The main rendering loop
         let first_frame_time = std::time::Instant::now();
@@ -309,7 +277,7 @@ fn main() {
             if let Ok(mut new_size) = window_size.lock() {
                 if new_size.2 {
                     context.resize(glutin::dpi::PhysicalSize::new(new_size.0, new_size.1));
-                    window_aspect_ratio = new_size.0 as f32 / new_size.1 as f32;
+                    window_aspect_ratio = (new_size.0/ new_size.1) as f32;
                     (*new_size).2 = false;
                     println!("Window was resized to {}x{}", new_size.0, new_size.1);
                     unsafe { gl::Viewport(0, 0, new_size.0 as i32, new_size.1 as i32); }
@@ -320,16 +288,16 @@ fn main() {
             if let Ok(keys) = pressed_keys.lock() {
                 for key in keys.iter() {
                     match key {
-                        VirtualKeyCode::W => camera.z -= speed * delta_time,
-                        VirtualKeyCode::S => camera.z += speed * delta_time,
-                        VirtualKeyCode::A => camera.x -= speed * delta_time,
-                        VirtualKeyCode::D => camera.x += speed * delta_time,            
-                        VirtualKeyCode::Space => camera.y -= speed * delta_time,
-                        VirtualKeyCode::LShift => camera.y += speed * delta_time,
-                        VirtualKeyCode::Left => camera.yaw -=  rotation_speed * delta_time,
-                        VirtualKeyCode::Right => camera.yaw += rotation_speed * delta_time,            
-                        VirtualKeyCode::Up => camera.pitch -= rotation_speed * delta_time,
-                        VirtualKeyCode::Down => camera.pitch += rotation_speed * delta_time,
+                        VirtualKeyCode::W => model.pos.z += speed * delta_time,
+                        VirtualKeyCode::S => model.pos.z -= speed * delta_time,
+                        VirtualKeyCode::A => model.pos.x -= speed * delta_time,
+                        VirtualKeyCode::D => model.pos.x += speed * delta_time,            
+                        VirtualKeyCode::Space => model.pos.y += speed * delta_time,
+                        VirtualKeyCode::LShift => model.pos.y -= speed * delta_time,
+                        VirtualKeyCode::Left => model.yaw -=  rotation_speed * delta_time,
+                        VirtualKeyCode::Right => model.yaw += rotation_speed * delta_time,            
+                        VirtualKeyCode::Up => model.pitch -= rotation_speed * delta_time,
+                        VirtualKeyCode::Down => model.pitch += rotation_speed * delta_time,
                         _ => {}  
                     }
                 }
@@ -346,7 +314,7 @@ fn main() {
             }
 
             // == // Please compute camera transforms here (exercise 2 & 3)
-            update_camera_matrix(&mut camera);
+            model.update_transformation_matrix();
 
             unsafe {
                 // Clear the color and depth buffers
@@ -357,7 +325,7 @@ fn main() {
                 my_shader.activate();
 
                 // Prepare affine transformation
-                let combined_transformation = projection * depth_transformation * camera.transformation;
+                let combined_transformation = projection * view * model.transformation;
                 gl::UniformMatrix4fv(0, 1, gl::TRUE, combined_transformation.as_ptr());
                 
                 // Bind VAO
@@ -366,7 +334,7 @@ fn main() {
                 // Draw elements
                 gl::DrawElements(
                     gl::TRIANGLES,
-                    9,
+                    15,
                     gl::UNSIGNED_INT,
                     std::ptr::null()
                 );

@@ -1,0 +1,34 @@
+model.transformation = glm::mat4(
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0,
+        );
+
+        let cos_pitch = camera.pitch.to_radians().cos();
+        let sin_pitch = camera.pitch.to_radians().sin();
+        let cos_yaw = camera.yaw.to_radians().cos();
+        let sin_yaw = camera.yaw.to_radians().sin();
+
+        let pitch_rotation = glm::mat4(
+            1.0, 0.0, 0.0, 0.0,
+            0.0, cos_pitch, -sin_pitch, 0.0,
+            0.0, sin_pitch, cos_pitch, 0.0,
+            0.0, 0.0, 0.0, 1.0
+        );
+
+        let yaw_rotation = glm::mat4(
+            cos_yaw, -sin_yaw, 0.0, 0.0,
+            sin_yaw, cos_yaw, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0
+        );
+
+        let rotation_matrix = pitch_rotation * yaw_rotation;
+
+        // Translation matrix based on camera position
+        let translation_vector = Vec3::new(-camera.x, -camera.y, -camera.z);
+        let translation_matrix = translate(&glm::Mat4::identity(), &translation_vector);
+
+        // Combine rotation and translation to form the view matrix
+        camera.transformation =  translation_matrix * rotation_matrix;
